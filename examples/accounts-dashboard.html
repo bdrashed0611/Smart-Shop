@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="bn">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Accounts Dashboard - Cash In / Cash Out (Demo)</title>
+  <style>
+    :root{
+      --bg:#f7f8fb;
+      --card:#fff;
+      --accent:#0b5ed7;
+      --danger:#dc3545;
+      --text:#111;
+      --muted:#6b7280;
+      --shadow: 0 6px 18px rgba(16,24,40,0.06);
+      font-family: "Noto Sans Bengali", sans-serif;
+    }
+    body{margin:0;background:var(--bg);color:var(--text);padding:28px}
+    .panel{max-width:980px;margin:0 auto}
+    .header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+    .title{font-size:1.25rem;font-weight:700}
+    .controls{display:flex;gap:8px;align-items:center}
+
+    /* Card */
+    .card{background:var(--card);padding:16px;border-radius:12px;box-shadow:var(--shadow)}
+
+    /* Accounts list */
+    .accounts-list{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px}
+    .acct{min-width:220px;padding:12px;border-radius:10px;background:linear-gradient(180deg,#fff,#fbfcff);border:1px solid #eef2ff}
+    .acct h4{margin:0 0 8px 0;font-size:1rem}
+    .acct p{margin:0;color:var(--muted);font-size:0.9rem}
+    .acct .balance{margin-top:8px;font-weight:700;color:var(--accent)}
+
+    /* Buttons */
+    .btn{display:inline-flex;align-items:center;gap:8px;border:0;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600}
+    .btn-primary{background:var(--accent);color:#fff}
+    .btn-outline{background:transparent;border:1px solid #dfe7ff;color:var(--text)}
+    .btn-danger{background:var(--danger);color:#fff}
+
+    /* Modal */
+    .modal-backdrop{position:fixed;inset:0;background:rgba(2,6,23,0.45);display:none;align-items:center;justify-content:center;padding:16px;z-index:2000}
+    .modal{background:var(--card);border-radius:12px;width:100%;max-width:480px;padding:18px;box-shadow:0 12px 30px rgba(2,6,23,0.2)}
+    .modal h3{margin:0 0 12px 0}
+    .form-row{display:flex;gap:8px;margin-bottom:10px}
+    .form-row input,.form-row select,textarea{flex:1;padding:10px;border-radius:8px;border:1px solid #e6eefc;font-size:0.95rem}
+    .form-actions{Display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+    .hidden{display:none}
+
+    /* small screens */
+    @media (max-width:520px){
+      .form-row{flex-direction:column}
+      .acct{min-width:100%}
+    }
+  </style>
+</head>
+<body>
+
+  <div class="panel">
+    <div class="header">
+      <div>
+        <div class="title">অ্যাকাউন্টসমূহ</div>
+        <div style="color:var(--muted);font-size:0.95rem">আপনার সব অ্যাকাউন্ট ও ব্যালান্স এখানে</div>
+      </div>
+
+      <div class="controls">
+        <button class="btn btn-outline" id="openAccountsMenu">মেনু</button>
+        <button class="btn btn-primary" id="btnCashIn">Cash In (নগদ জমা)</button>
+        <button class="btn btn-danger" id="btnCashOut">Cash Out (নগদ উত্তোলন)</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <strong>অ্যাকাউন্ট তালিকা</strong>
+        <span style="color:var(--muted)">আপডেট: <small id="lastSync">--</small></span>
+      </div>
+
+      <div class="accounts-list" id="accountsList">
+        <!-- উদাহরণ অ্যাকাউন্ট কার্ড (JS দিয়ে replace করা যাবে) -->
+        <div class="acct">
+          <h4>মেইন ক্যাশ</h4>
+          <p>রেকর্ড: ১২ টি লেনদেন</p>
+          <div class="balance">৳ 12,500.00</div>
+        </div>
+        <div class="acct">
+          <h4>চেকিং অ্যাকাউন্ট</h4>
+          <p>ব্যাংক: ডেসিমা ব্যাংক</p>
+          <div class="balance">৳ 42,800.50</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal backdrop (reused for both cash in/out) -->
+  <div class="modal-backdrop" id="modalBackdrop" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal" role="document" aria-labelledby="modalTitle">
+      <h3 id="modalTitle">টাইটেল</h3>
+
+      <form id="cashForm">
+        <div class="form-row">
+          <select id="accountSelect" required>
+            <option value="">অ্যাকাউন্ট নির্বাচন করুন</option>
+            <option value="cash">মেইন ক্যাশ</option>
+            <option value="bank">চেকিং অ্যাকাউন্ট</option>
+          </select>
+          <input type="number" id="amount" placeholder="রাশি (৳)" min="0.01" step="0.01" required />
+        </div>
+
+        <div class="form-row">
+          <input type="text" id="ref" placeholder="রেফারেন্স (ঐচ্ছিক)" />
+        </div>
+
+        <div class="form-row">
+          <textarea id="note" placeholder="বিবরণ (ঐচ্ছিক)" rows="3"></textarea>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="btn btn-outline" id="cancelBtn">বাতিল</button>
+          <button type="submit" class="btn btn-primary" id="submitBtn">সংরক্ষণ করুন</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+<script>
+  // Elements
+  const btnCashIn = document.getElementById('btnCashIn');
+  const btnCashOut = document.getElementById('btnCashOut');
+  const backdrop = document.getElementById('modalBackdrop');
+  const modalTitle = document.getElementById('modalTitle');
+  const cashForm = document.getElementById('cashForm');
+  const cancelBtn = document.getElementById('cancelBtn');
+  const submitBtn = document.getElementById('submitBtn');
+  const lastSync = document.getElementById('lastSync');
+
+  // state
+  let currentType = null; // 'in' or 'out'
+
+  // open modal helper
+  function openModal(type){
+    currentType = type;
+    backdrop.style.display = 'flex';
+    backdrop.setAttribute('aria-hidden','false');
+    if(type === 'in'){
+      modalTitle.textContent = 'Cash In — নগদ জমা';
+      submitBtn.textContent = 'নগদ জমা করুন';
+      submitBtn.classList.remove('btn-danger');
+      submitBtn.classList.add('btn-primary');
+    } else {
+      modalTitle.textContent = 'Cash Out — নগদ উত্তোলন';
+      submitBtn.textContent = 'নগদ উত্তোলন করুন';
+      submitBtn.classList.remove('btn-primary');
+      submitBtn.classList.add('btn-danger');
+    }
+    // focus first input
+    document.getElementById('accountSelect').focus();
+  }
+
+  // close modal
+  function closeModal(){
+    backdrop.style.display = 'none';
+    backdrop.setAttribute('aria-hidden','true');
+    cashForm.reset();
+    currentType = null;
+  }
+
+  // open handlers
+  btnCashIn.addEventListener('click', ()=> openModal('in'));
+  btnCashOut.addEventListener('click', ()=> openModal('out'));
+
+  // cancel
+  cancelBtn.addEventListener('click', closeModal);
+
+  // click outside to close
+  backdrop.addEventListener('click', (e)=>{
+    if(e.target === backdrop) closeModal();
+  });
+
+  // form submit
+  cashForm.addEventListener('submit', (e)=>{
+    e.preventDefault();
+    const data = {
+      type: currentType === 'in' ? 'cash_in' : 'cash_out',
+      account: document.getElementById('accountSelect').value,
+      amount: parseFloat(document.getElementById('amount').value),
+      reference: document.getElementById('ref').value || null,
+      note: document.getElementById('note').value || null,
+      timestamp: new Date().toISOString()
+    };
+
+    // পদক্ষেপ: এখানে আপনি সার্ভারে POST করবেন (উদাহরণ নীচে)
+    console.log('Submitting transaction:', data);
+
+    // Example: replace console.log with fetch to your API
+    /*
+    fetch('/api/accounts/transactions', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(data)
+    }).then(r => r.json()).then(res => {
+      // সফল হলে মেসেজ দেখান, তালিকা আপডেট করুন
+    }).catch(err => {
+      // ত্রুটি হ্যান্ডেল
+    });
+    */
+
+    // UI আপডেট (ডেমো): last sync timestamp দেখানো
+    lastSync.textContent = new Date().toLocaleString();
+
+    // ক্লোজ ও রিসেট
+    closeModal();
+    // Optional: রিলোড বা অ্যাকাউন্ট ব্যালান্স আপডেট করুন
+  });
+
+  // Accessibility: Escape key closes modal
+  document.addEventListener('keydown', (e)=>{
+    if(e.key === 'Escape' && currentType) closeModal();
+  });
+
+  // (Optional) Accounts menu button (উদাহরণ)
+  document.getElementById('openAccountsMenu').addEventListener('click', ()=>{
+    alert('অ্যাকাউন্ট মেনু: এখানে আপনি অ্যাকাউন্ট যোগ/এডিট/রিপোর্ট দেখতে পারবেন (implement as needed).');
+  });
+</script>
+
+</body>
+</html>
